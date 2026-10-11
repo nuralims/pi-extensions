@@ -236,31 +236,58 @@ export function serializeRunTranscript(
 }
 
 export function buildFallbackRecap(entries: readonly SessionEntry[]) {
-  const toolNames: string[] = [];
+  let lastUserText = "";
   let finalAssistantText = "";
 
   for (const entry of entries) {
-    if (entry.type !== "message" || entry.message.role !== "assistant")
-      continue;
-    for (const block of entry.message.content) {
-      if (block.type === "toolCall") toolNames.push(block.name);
-      if (block.type === "text" && block.text.trim()) {
-        finalAssistantText = redactSecrets(block.text.trim());
+    if (entry.type !== "message") continue;
+    if (entry.message.role === "user") {
+      for (const block of entry.message.content) {
+        if (block.type === "text" && block.text.trim()) {
+          lastUserText = block.text.trim();
+        }
+      }
+    } else if (entry.message.role === "assistant") {
+      for (const block of entry.message.content) {
+        if (block.type === "text" && block.text.trim()) {
+          finalAssistantText = redactSecrets(block.text.trim());
+        }
       }
     }
   }
 
-  const tools = [...new Set(toolNames)];
-  const activity =
-    tools.length > 0
-      ? ` The run used ${toolNames.length} tool call${toolNames.length === 1 ? "" : "s"} across ${tools.join(", ")}.`
-      : "";
-  const result = finalAssistantText
-    ? ` ${capped(finalAssistantText.replace(/\s+/g, " "), 700, "final response capped")}`
-    : "";
+  const combined = `${lastUserText} ${finalAssistantText}`;
+  const isIndonesian =
+    /\b(yang|dan|di|ini|itu|ke|dari|untuk|bisa|tolong|coba|buat|gimana|kenapa|apakah|saya|kamu|sudah|belum|jangan|akan|pls|mohon|dengan)\b/i.test(
+      combined,
+    );
+
+  // Clean raw markdown, headers, and codeblocks to get clear human sentences
+  const cleanSummary = finalAssistantText
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`[^`]+`/g, (m) => m)
+    .replace(/^#+\s+/gm, "")
+    .replace(/^[-*•]\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const sentences = cleanSummary.split(/(?<=[.!?])\s+/);
+  let humanRecap = sentences.slice(0, 2).join(" ");
+  if (humanRecap.length > 250) {
+    humanRecap = `${humanRecap.slice(0, 247).trimEnd()}…`;
+  }
+  if (!humanRecap) {
+    humanRecap = isIndonesian
+      ? "Pekerjaan telah selesai dijalankan sesuai instruksi."
+      : "The requested work has been completed as instructed.";
+  }
+
+  const humanNext = isIndonesian
+    ? "Silakan cek hasilnya atau beri tahu jika ada yang ingin disesuaikan."
+    : "Review the result above and let me know if anything needs tuning.";
 
   return {
-    recap: `The main-agent run completed.${activity}${result}`.trim(),
-    next: "Review the completed work above and continue if anything remains.",
+    recap: humanRecap,
+    next: humanNext,
   };
 }

@@ -35,9 +35,15 @@ class RecapCard {
 
   render(width: number) {
     const box = new Box(1, 1, (text) => this.theme.bg("customMessageBg", text));
+    const isIndo = /\b(dan|yang|di|sudah|bisa|untuk|cek|silakan|lanjut|telah|sesuai)\b/i.test(
+      `${this.data.recap} ${this.data.next}`,
+    );
+    const cardTitle = isIndo ? "Ringkasan" : "Recap";
+    const nextLabel = isIndo ? "Lanjut:" : "Next:";
+
     const title =
       this.theme.fg("accent", "✦ ") +
-      this.theme.fg("customMessageLabel", this.theme.bold("Recap"));
+      this.theme.fg("customMessageLabel", this.theme.bold(cardTitle));
     box.addChild(new Text(title, 0, 0));
     box.addChild(
       new Markdown(this.data.recap, 0, 1, getMarkdownTheme(), {
@@ -46,13 +52,13 @@ class RecapCard {
     );
     box.addChild(
       new Text(
-        `${this.theme.fg("accent", this.theme.bold("Next:"))} ${this.theme.fg("customMessageText", this.data.next)}`,
+        `${this.theme.fg("accent", this.theme.bold(nextLabel))} ${this.theme.fg("customMessageText", this.data.next)}`,
         0,
         0,
       ),
     );
     if (this.expanded) {
-      const source = `${this.data.provider}/${this.data.model} · ${this.data.reasoning}${this.data.fallback ? " · local fallback" : ""}`;
+      const source = `${this.data.provider}/${this.data.model} · ${this.data.reasoning}${this.data.fallback ? (isIndo ? " · fallback lokal" : " · local fallback") : ""}`;
       box.addChild(new Text(this.theme.fg("dim", source), 0, 1));
     }
     return box.render(width);
