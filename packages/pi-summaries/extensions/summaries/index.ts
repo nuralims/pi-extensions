@@ -148,12 +148,15 @@ export default function (pi: ExtensionAPI) {
     if (!loadSummaryConfig().enabled) return;
     statusContext = ctx;
     cancelScheduled();
-    // Recap only once the session has gone quiet, so a user working through
-    // back-to-back prompts is never interrupted by one.
+    const delay = idleDelayMs();
+    if (delay <= 0) {
+      void writeRecap(ctx);
+      return;
+    }
     idleTimer = setTimeout(() => {
       idleTimer = undefined;
       void writeRecap(ctx);
-    }, idleDelayMs());
+    }, delay);
     idleTimer.unref();
   };
 

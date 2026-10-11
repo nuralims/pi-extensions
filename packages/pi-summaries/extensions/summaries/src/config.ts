@@ -35,19 +35,19 @@ export const DEFAULT_SUMMARY_CONFIG: SummaryConfig = {
 };
 
 /**
- * Quiet time after a run before its recap is written. Default 10s idle delay.
+ * Quiet time after a run before its recap is written. Default 0 (langsung recap now).
  * Override with PI_SUMMARY_IDLE_MS=<milliseconds>.
  */
-export const DEFAULT_IDLE_DELAY_MS = 10_000;
-export const MIN_IDLE_DELAY_MS = 2_000;
+export const DEFAULT_IDLE_DELAY_MS = 0;
+export const MIN_IDLE_DELAY_MS = 0;
 
 export function idleDelayMs() {
   const override = Number.parseInt(
     process.env.PI_SUMMARY_IDLE_MS?.trim() ?? "",
     10,
   );
-  return Number.isFinite(override) && override > 0
-    ? Math.max(MIN_IDLE_DELAY_MS, override)
+  return Number.isFinite(override) && override >= 0
+    ? override
     : DEFAULT_IDLE_DELAY_MS;
 }
 
