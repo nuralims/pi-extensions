@@ -75,26 +75,23 @@ export default function (pi: ExtensionAPI) {
     for (const controller of activeSummaries.keys()) controller.abort();
   };
 
-  const writeRecap = async (ctx: ExtensionContext) => {
+  const writeRecap = async (ctx: ExtensionContext, force = false) => {
     const run = runBoundary.pending();
-    if (!run) return;
+    if (!run && !force) return;
 
     const config = loadSummaryConfig();
     if (
-      !config.enabled ||
+      (!config.enabled && !force) ||
       !sessionActive ||
-      !ctx.isIdle() ||
-      ctx.hasPendingMessages() ||
-      // Never mid-child-run: a subagent still working means the run isn't
-      // over yet, and its settle will re-arm the recap.
-      anyRunning()
+      (!force && (!ctx.isIdle() || ctx.hasPendingMessages() || anyRunning()))
     ) {
       return;
     }
 
+    const baselineLeafId = run ? run.baselineLeafId : null;
     const entries = getRunEntries(
       ctx.sessionManager.getBranch(),
-      run.baselineLeafId,
+      baselineLeafId,
     );
     if (entries.length === 0) {
       runBoundary.clear();
@@ -240,13 +237,20 @@ export default function (pi: ExtensionAPI) {
       }
 
       const current = loadSummaryConfig();
-      const choice = await ctx.ui.select("Recap", [
-        "Change model…",
-        current.enabled ? "Disable recaps" : "Enable recaps",
+      const choice = await ctx.ui.select("Recap / Ringkasan Run", [
+        "Buat rekap sekarang (Generate recap now)",
+        "Ganti model (Change model…)",
+        current.enabled ? "Nonaktifkan rekap (Disable)" : "Aktifkan rekap (Enable)",
       ]);
       if (choice === undefined) return;
 
-      if (choice === "Change model…") {
+      if (choice.startsWith("Buat rekap sekarang")) {
+        cancelScheduled();
+        await writeRecap(ctx, true);
+        return;
+      }
+
+      if (choice.startsWith("Ganti model")) {
         const model = await openModelPicker(ctx);
         if (!model) return;
 

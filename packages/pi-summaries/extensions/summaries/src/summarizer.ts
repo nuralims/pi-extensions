@@ -106,10 +106,17 @@ async function requestRecap(options: {
   readonly reasoning: SummaryConfig["reasoning"];
   readonly signal: AbortSignal;
 }) {
-  const model = options.modelRegistry.find(
+  let model = options.modelRegistry.find(
     options.config.provider,
     options.config.model,
   );
+  if (!model) {
+    // ponytail: fallback to an available flash/fast model if configured model is missing
+    const available = options.modelRegistry.getAvailable();
+    model =
+      available.find((m) => /flash|haiku|mini|small|chat/i.test(m.id)) ??
+      available[0];
+  }
   if (!model) {
     throw new SummaryError({
       message: `Summary model is unavailable: ${options.config.provider}/${options.config.model}`,

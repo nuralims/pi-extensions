@@ -188,7 +188,10 @@ export function curatedModels<T extends ModelLike>(
     const picked = models.filter((model) => enabled.has(modelKey(model)));
     if (picked.length) return picked.sort(byCost);
   }
-  return models.filter((model) => (model.cost?.output ?? 0) > 0).sort(byCost);
+  const priced = models.filter((model) => (model.cost?.output ?? 0) > 0);
+  if (priced.length > 0) return priced.sort(byCost);
+  // ponytail: fallback to unpriced models (e.g. local / proxy routers like 9router)
+  return [...models].sort((a, b) => modelKey(a).localeCompare(modelKey(b)));
 }
 
 /** Curated models an agent is allowed to select on its own. */

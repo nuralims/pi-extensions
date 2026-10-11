@@ -29,18 +29,17 @@ export interface SummaryConfig {
 
 export const DEFAULT_SUMMARY_CONFIG: SummaryConfig = {
   enabled: true,
-  provider: "deepseek",
-  model: "deepseek-flash",
-  reasoning: "medium",
+  provider: "9router",
+  model: "ag/gemini-3.8-flash-medium",
+  reasoning: "off",
 };
 
 /**
- * Quiet time after a run before its recap is written, matching Claude Code's
- * away-summary delay: three minutes, and never under thirty seconds. Override
- * with PI_SUMMARY_IDLE_MS=<milliseconds>.
+ * Quiet time after a run before its recap is written. Default 10s idle delay.
+ * Override with PI_SUMMARY_IDLE_MS=<milliseconds>.
  */
-export const DEFAULT_IDLE_DELAY_MS = 180_000;
-export const MIN_IDLE_DELAY_MS = 30_000;
+export const DEFAULT_IDLE_DELAY_MS = 10_000;
+export const MIN_IDLE_DELAY_MS = 2_000;
 
 export function idleDelayMs() {
   const override = Number.parseInt(
