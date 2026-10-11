@@ -48,7 +48,7 @@ async function waitForCancellation(
 export default function (pi: ExtensionAPI) {
   const runBoundary = createRunBoundary();
   const activeSummaries = new Map<AbortController, Promise<void>>();
-  let sessionActive = false;
+  let sessionActive = true;
   let statusContext: ExtensionContext | undefined;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
   let activityUnsubscribe: (() => void) | undefined;
@@ -89,10 +89,13 @@ export default function (pi: ExtensionAPI) {
     }
 
     const baselineLeafId = run ? run.baselineLeafId : null;
-    const entries = getRunEntries(
+    let entries = getRunEntries(
       ctx.sessionManager.getBranch(),
       baselineLeafId,
     );
+    if (entries.length === 0 && force) {
+      entries = ctx.sessionManager.getBranch().slice(-10);
+    }
     if (entries.length === 0) {
       runBoundary.clear();
       return;
@@ -141,7 +144,7 @@ export default function (pi: ExtensionAPI) {
    * writeRecap stay the authority; this only decides whether a timer exists.
    */
   const scheduleRecap = (ctx: ExtensionContext) => {
-    if (ctx.mode !== "tui" || !sessionActive || !runBoundary.pending()) return;
+    if (!sessionActive || !runBoundary.pending()) return;
     if (!loadSummaryConfig().enabled) return;
     statusContext = ctx;
     cancelScheduled();
@@ -195,13 +198,14 @@ export default function (pi: ExtensionAPI) {
   pi.on("user_bash", () => onUserActivity());
 
   pi.on("before_agent_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
+    statusContext = ctx;
+    sessionActive = true;
     onUserActivity();
     runBoundary.begin(ctx.sessionManager.getLeafId());
   });
 
   pi.on("agent_settled", (_event, ctx) => {
-    if (ctx.mode !== "tui" || !sessionActive || !runBoundary.pending()) return;
+    if (!sessionActive || !runBoundary.pending()) return;
     scheduleRecap(ctx);
   });
 
@@ -225,7 +229,13 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand("recap", {
     description:
       "Configure run recaps: change the model, or enable/disable them",
-    handler: async (_args, ctx) => {
+    handler: async (args, ctx) => {
+      if (args?.trim() === "now" || args?.trim() === "sekarang") {
+        cancelScheduled();
+        ctx.ui.notify?.("Membuat rekap run...", "info");
+        await writeRecap(ctx, true);
+        return;
+      }
       if (ctx.mode !== "tui") {
         if (ctx.hasUI) {
           ctx.ui.notify(
