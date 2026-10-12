@@ -288,10 +288,15 @@ export function buildFallbackRecap(entries: readonly SessionEntry[]) {
   const humanRecap = bullets.length ? `${lead}\n${bullets.join("\n")}` : lead;
 
   // Saran lanjut dari konteks: cari perintah /reload, tes, atau item yang disebut belum selesai.
-  const pending = plain.match(/(?:belum|tertunda|pending|todo|selanjutnya|next)[^.\n]{8,140}/i)?.[0]?.trim();
+  const rawPending = plain.match(/(?:belum|tertunda|pending|todo|selanjutnya|next)[^.\n]{8,140}/i)?.[0]?.trim();
+  // Bersihkan kata awalan redundant jika kecocokan sudah diawali kata "belum" atau "selanjutnya"
+  const cleanPending = rawPending
+    ? rawPending.replace(/^(belum|tertunda|pending|todo|selanjutnya|next)[:\s-]*/i, "").trim()
+    : "";
+
   const needsReload = /\/reload/.test(finalAssistantText);
-  const humanNext = pending
-    ? isIndonesian ? `Lanjutkan: ${pending}` : `Continue with: ${pending}`
+  const humanNext = cleanPending
+    ? isIndonesian ? `Lanjutkan: ${cleanPending}` : `Continue with: ${cleanPending}`
     : needsReload
       ? isIndonesian ? "Jalankan /reload lalu uji perubahan pada satu tugas nyata." : "Run /reload, then test the change on one real task."
       : isIndonesian ? "Uji perubahan ini pada kasus nyata, lalu tentukan bagian berikutnya yang ingin disempurnakan." : "Try this on a real case, then pick the next part to refine.";
