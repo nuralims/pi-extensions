@@ -262,29 +262,39 @@ export function buildFallbackRecap(entries: readonly SessionEntry[]) {
       combined,
     );
 
-  // Clean raw markdown, headers, and codeblocks to get clear human sentences
-  const cleanSummary = finalAssistantText
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`]+`/g, (m) => m)
+  // ponytail: heuristik lokal tanpa LLM; upgrade = biarkan model ringkasan yang menulis.
+  const plain = finalAssistantText.replace(/```[\s\S]*?```/g, "");
+  const bullets = plain
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^([-*•]|\d+\.)\s+\S/.test(l))
+    .map((l) => l.replace(/^([-*•]|\d+\.)\s+/, "").replace(/\*\*/g, ""))
+    .slice(0, 6)
+    .map((l) => `- ${l.length > 160 ? `${l.slice(0, 157).trimEnd()}…` : l}`);
+  const prose = plain
     .replace(/^#+\s+/gm, "")
-    .replace(/^[-*•]\s+/gm, "")
+    .split("\n")
+    .filter((l) => !/^\s*([-*•]|\d+\.|\|)/.test(l))
+    .join(" ")
     .replace(/\s+/g, " ")
     .trim();
-
-  const sentences = cleanSummary.split(/(?<=[.!?])\s+/);
-  let humanRecap = sentences.slice(0, 2).join(" ");
-  if (humanRecap.length > 250) {
-    humanRecap = `${humanRecap.slice(0, 247).trimEnd()}…`;
-  }
-  if (!humanRecap) {
-    humanRecap = isIndonesian
+  let lead = prose.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
+  if (lead.length > 250) lead = `${lead.slice(0, 247).trimEnd()}…`;
+  if (!lead) {
+    lead = isIndonesian
       ? "Pekerjaan telah selesai dijalankan sesuai instruksi."
       : "The requested work has been completed as instructed.";
   }
+  const humanRecap = bullets.length ? `${lead}\n${bullets.join("\n")}` : lead;
 
-  const humanNext = isIndonesian
-    ? "Silakan cek hasilnya atau beri tahu jika ada yang ingin disesuaikan."
-    : "Review the result above and let me know if anything needs tuning.";
+  // Saran lanjut dari konteks: cari perintah /reload, tes, atau item yang disebut belum selesai.
+  const pending = plain.match(/(?:belum|tertunda|pending|todo|selanjutnya|next)[^.\n]{8,140}/i)?.[0]?.trim();
+  const needsReload = /\/reload/.test(finalAssistantText);
+  const humanNext = pending
+    ? isIndonesian ? `Lanjutkan: ${pending}` : `Continue with: ${pending}`
+    : needsReload
+      ? isIndonesian ? "Jalankan /reload lalu uji perubahan pada satu tugas nyata." : "Run /reload, then test the change on one real task."
+      : isIndonesian ? "Uji perubahan ini pada kasus nyata, lalu tentukan bagian berikutnya yang ingin disempurnakan." : "Try this on a real case, then pick the next part to refine.";
 
   return {
     recap: humanRecap,
